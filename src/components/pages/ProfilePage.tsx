@@ -21,9 +21,10 @@ import { useFeaturedUsers } from '@/queries/featured'
 import { productsByPubkeyQueryOptions } from '@/queries/products'
 import { profileByIdentifierQueryOptions } from '@/queries/profiles'
 import { useShippingOptionsByPubkey, getShippingService, getShippingPickupAddress, getShippingTitle } from '@/queries/shipping'
+import { isHexPubkey } from '@/lib/nostr/validation'
 import { useAutoAnimate } from '@formkit/auto-animate/react'
 import type { NDKEvent } from '@nostr-dev-kit/ndk'
-import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query'
+import { useSuspenseQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Edit, MapPin, MessageCircle, Minus, Plus, Share2, Timer } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
@@ -42,7 +43,11 @@ export function ProfilePage({ profileId }: ProfilePageProps) {
 	const { data: profileData } = useSuspenseQuery(profileByIdentifierQueryOptions(profileId))
 	const { profile, user } = profileData || {}
 
-	const { data: sellerProducts } = useSuspenseQuery(productsByPubkeyQueryOptions(user?.pubkey || ''))
+	const validSellerPubkey = !!user?.pubkey && isHexPubkey(user.pubkey)
+	const { data: sellerProducts = [] } = useQuery({
+		...productsByPubkeyQueryOptions(user?.pubkey || ''),
+		enabled: validSellerPubkey,
+	})
 
 	const [showFullAbout, setShowFullAbout] = useState(false)
 	const [bannerIsLoadable, setBannerIsLoadable] = useState<boolean | null>(null)
@@ -64,6 +69,30 @@ export function ProfilePage({ profileId }: ProfilePageProps) {
 
 	// Get entity permissions
 	const permissions = useEntityPermissions(user?.pubkey)
+
+	if (!profile && !user) {
+		return (
+			<div className="relative flex flex-col min-h-screen">
+				<div className="top-0 right-0 left-0 z-0 absolute bg-hero-image-margin h-[40vh] sm:h-[40vh] md:h-[50vh] overflow-hidden">
+					<div
+						className="w-full h-full"
+						style={{
+							background: `linear-gradient(45deg, ${getHexColorFingerprintFromHexPubkey(profileId)} 0%, #000 100%)`,
+							opacity: 0.8,
+						}}
+					/>
+				</div>
+				<div className="z-10 relative flex flex-col flex-1 pt-[18vh] sm:pt-[22vh] md:pt-[30vh] px-4">
+					<div className="mx-auto w-full max-w-3xl rounded-3xl border border-border bg-background/90 p-8 text-center shadow-xl backdrop-blur">
+						<h1 className="text-3xl font-semibold text-foreground">Could not load user profile</h1>
+						<p className="mt-4 text-sm text-muted-foreground">
+							This profile is unavailable or could not be loaded. Please try again later or check the URL.
+						</p>
+					</div>
+				</div>
+			</div>
+		)
+	}
 
 	// Get blacklist and featured status
 	const { data: blacklistSettings } = useBlacklistSettings(appPubkey)

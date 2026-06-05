@@ -206,6 +206,34 @@ function getRelayUrls(overrideRelays?: string[]): string[] {
 
 export const ndkActions = {
 	/**
+	 * Remove invalid pubkeys from filters to avoid creating malformed NDK subscriptions.
+	 * Currently strips non-hex 64-char values from `authors` and `#p` arrays.
+	 */
+	sanitizeFilters: (filters: NDKFilter | NDKFilter[]) => {
+		const sanitize = (f: any) => {
+			if (!f || typeof f !== 'object') return f
+			const copy = { ...f }
+			const isHex = (v: any) => typeof v === 'string' && /^[0-9a-f]{64}$/i.test(v)
+
+			if (Array.isArray(copy.authors)) {
+				const valid = copy.authors.filter(isHex)
+				if (valid.length > 0) copy.authors = valid
+				else delete copy.authors
+			}
+
+			if (Array.isArray(copy['#p'])) {
+				const valid = copy['#p'].filter(isHex)
+				if (valid.length > 0) copy['#p'] = valid
+				else delete copy['#p']
+			}
+
+			return copy
+		}
+
+		if (Array.isArray(filters)) return filters.map(sanitize)
+		return sanitize(filters)
+	},
+	/**
 	 * Ensure the instance relay (config.appRelay) is always present,
 	 * even before a signer exists (read-only queries must still work).
 	 */
@@ -247,7 +275,9 @@ export const ndkActions = {
 				resolve(new Set(events.values()))
 			}
 
-			const subscription = ndk.subscribe(filters, {
+			// Sanitize filters to avoid passing invalid pubkeys into NDK
+			const sanitized = ndkActions.sanitizeFilters(filters)
+			const subscription = ndk.subscribe(sanitized as any, {
 				...subOpts,
 				closeOnEose: true,
 				onEvent: (event) => {

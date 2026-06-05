@@ -3,6 +3,7 @@ import { type NDKUserProfile, NDKEvent, NDKUser } from '@nostr-dev-kit/ndk'
 import { NDKWoT } from '@nostr-dev-kit/wot'
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { profileKeys } from './queryKeyFactory'
+import { isHexPubkey } from '@/lib/nostr/validation'
 
 export const fetchProfileByNpub = async (npub: string): Promise<NDKUserProfile | null> => {
 	const ndk = ndkActions.getNDK()
@@ -278,7 +279,8 @@ export const getWotScore = async (pubkey: string): Promise<number | null> => {
 	const ndk = ndkActions.getNDK()
 	if (!ndk) throw new Error('NDK not initialized')
 	if (!ndk.activeUser) return null
-
+	// Guard against invalid pubkeys which may appear in corrupted follow lists
+	if (!isHexPubkey(pubkey)) return null
 	try {
 		const wot = new NDKWoT(ndk, pubkey)
 		await wot.load({

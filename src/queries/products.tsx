@@ -22,6 +22,7 @@ import { getCoordsFromATag, getATagFromCoords } from '@/lib/utils/coords.ts'
 import { discoverNip50Relays } from '@/lib/relays'
 import { filterBlacklistedEvents, filterBlacklistedPubkeys } from '@/lib/utils/blacklistFilters'
 import { naddrFromAddress } from '@/lib/nostr/naddr'
+import { isHexPubkey } from '@/lib/nostr/validation'
 
 // Re-export productKeys for use in other query files
 export { productKeys }
@@ -240,6 +241,11 @@ export const fetchProduct = async (id: string) => {
  * @returns Array of product events sorted by creation date (blacklist filtered, optionally hidden products excluded)
  */
 export const fetchProductsByPubkey = async (pubkey: string, includeHidden: boolean = false, limit: number = 50) => {
+	if (!isHexPubkey(pubkey)) {
+		console.warn('Invalid seller pubkey, returning empty products by pubkey list')
+		return []
+	}
+
 	const ndk = ndkActions.getNDK()
 	if (!ndk) {
 		console.warn('NDK not ready, returning empty products by pubkey list')
@@ -372,6 +378,7 @@ export const productsByPubkeyQueryOptions = (pubkey: string, includeHidden: bool
 	queryOptions({
 		queryKey: includeHidden ? [...productKeys.byPubkey(pubkey), 'includeHidden'] : productKeys.byPubkey(pubkey),
 		queryFn: () => fetchProductsByPubkey(pubkey, includeHidden),
+		enabled: !!pubkey && isHexPubkey(pubkey),
 	})
 
 /**

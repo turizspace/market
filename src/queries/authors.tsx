@@ -3,6 +3,7 @@ import type { NDKFilter } from '@nostr-dev-kit/ndk'
 import { authorKeys } from './queryKeyFactory'
 import { queryOptions } from '@tanstack/react-query'
 import { ndkActions } from '@/lib/stores/ndk'
+import { isHexPubkey } from '@/lib/nostr/validation'
 
 export type NostrAuthor = {
 	id: string
@@ -21,6 +22,11 @@ const transformEvent = (event: NDKEvent): NostrAuthor => ({
 })
 
 export const fetchAuthor = async (pubkey: string) => {
+	// Guard against invalid pubkeys to avoid creating malformed NDK filters
+	if (!isHexPubkey(pubkey)) {
+		throw new Error('Invalid pubkey')
+	}
+
 	const filter: NDKFilter = {
 		kinds: [0], // kind 0 is metadata
 		authors: [pubkey],
